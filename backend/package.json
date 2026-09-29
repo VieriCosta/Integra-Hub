@@ -1,0 +1,35 @@
+{
+  "name": "integrahub-backend",
+  "version": "1.0.0",
+  "description": "API do IntegraHub para gerenciamento de integracoes.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test": "node --test",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "keywords": [
+    "integrations",
+    "express",
+    "prisma",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^6.14.0",
+    "axios": "^1.19.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "prisma": "^6.14.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
+  }
+}

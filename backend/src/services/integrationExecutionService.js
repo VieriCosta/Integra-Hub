@@ -1,0 +1,134 @@
+const integrationRepository = require("../repositories/integrationRepository");
+const executionRepository = require("../repositories/integrationExecutionRepository");
+const { executeHttpRequest } = require("./httpClientService");
+const { AppError } = require("../utils/AppError");
+const { sanitizeExecution } = require("../utils/headerMasker");
+const { validateDestinationUrl } = require("../utils/urlValidator");
+const { parsePagination } = require("../utils/pagination");
+const { ownerWhere, executionOwnerWhere } = require("../utils/accessScope");
+
+const EXECUTION_STATUSES = new Set(["PENDING", "RUNNING", "SUCCESS", "ERROR"]);
+
+function parseId(id) {
+  const parsedId = Number(id);
+
+  if (!Number.isInteger(parsedId) || parsedId <= 0) {
+    throw new AppError("Identificador inválido.", 400);
+  }
+
+  return parsedId;
+}
+
+function buildRequestSnapshot(integration) {
+  return {
+    requestUrl: integration.baseUrl,
+    requestMethod: integration.method,
+    requestHeaders: integration.headers || null,
+    requestQueryParams: integration.queryParams || null,
+    requestBody: ["POST", "PUT", "PATCH"].includes(integration.method) ? integration.body : null
+  };
+}
+
+async function executeIntegration(id, user) {
+  const integrationId = parseId(id);
+  const integration = await integrationRepository.findById(integrationId, ownerWhere(user));
+
+  if (!integration) {
+    throw new AppError("Integração não encontrada.", 404);
+  }
+
+  if (integration.status !== "ACTIVE") {
+    throw new AppError("Integração inativa não pode ser executada.", 400);
+  }
+
+  if (!validateDestinationUrl(integration.baseUrl)) {
+    throw new AppError("A URL da integração é inválida. Use apenas http:// ou https://.", 400);
+  }
+
+  const requestSnapshot = buildRequestSnapshot(integration);
+  const startedAt = new Date();
+
+  const execution = await executionRepository.create({
+    integrationId,
+    status: "RUNNING",
+    startedAt,
+    ...sanitizeExecution(requestSnapshot)
+  }, user.id);
+
+  const result = await executeHttpRequest(integration);
+
+  const updatedExecution = await executionRepository.update(execution.id, {
+    status: result.status,
+    httpStatus: result.httpStatus,
+    responseBody: sanitizeExecution({ responseBody: result.responseBody }).responseBody,
+    errorMessage: result.errorMessage,
+    startedAt: result.startedAt,
+    finishedAt: result.finishedAt,
+    durationMs: result.durationMs
+  }, user.id);
+
+  return sanitizeExecution({
+    ...updatedExecution,
+    integration: {
+      id: integration.id,
+      name: integration.name,
+      description: integration.description,
+      status: integration.status
+    }
+  });
+}
+
+async function listExecutionsByIntegration(id, pageValue = 1, pageSizeValue = 20, user) {
+  const integrationId = parseId(id);
+  const { page, pageSize } = parsePagination(pageValue, pageSizeValue);
+  const integration = await integrationRepository.findById(integrationId, ownerWhere(user));
+
+  if (!integration) {
+    throw new AppError("Integração não encontrada.", 404);
+  }
+
+  const [items, total] = await Promise.all([
+    executionRepository.findByIntegrationId(integrationId, page, pageSize),
+    executionRepository.countByIntegrationId(integrationId)
+  ]);
+  return { items, total, page, pageSize };
+}
+
+async function listExecutions(pageValue = 1, pageSizeValue = 20, statusValue, integrationIdValue, user, ownerIdValue) {
+  const { page, pageSize } = parsePagination(pageValue, pageSizeValue);
+  const status = statusValue ? String(statusValue).toUpperCase() : null;
+  if (status && !EXECUTION_STATUSES.has(status)) {
+    throw new AppError("Status de execução inválido.", 400);
+  }
+  const integrationId = integrationIdValue ? parseId(integrationIdValue) : null;
+  const scope = executionOwnerWhere(user, ownerIdValue);
+  const [items, total] = await Promise.all([
+    executionRepository.findAll(page, pageSize, status, integrationId, scope),
+    executionRepository.countAll(status, integrationId, scope)
+  ]);
+  return { items, total, page, pageSize };
+}
+
+async function recoverStaleExecutions() {
+  const finishedAt = new Date();
+  const before = new Date(finishedAt.getTime() - 120000);
+  return executionRepository.recoverStaleRunning(before, finishedAt);
+}
+
+async function getExecutionById(id, user) {
+  const execution = await executionRepository.findById(parseId(id), executionOwnerWhere(user));
+
+  if (!execution) {
+    throw new AppError("Execução não encontrada.", 404);
+  }
+
+  return sanitizeExecution(execution);
+}
+
+module.exports = {
+  executeIntegration,
+  listExecutionsByIntegration,
+  listExecutions,
+  getExecutionById,
+  recoverStaleExecutions
+};

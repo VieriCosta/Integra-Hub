@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Administração | IntegraHub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/style.css">
+  </head>
+  <body class="auth-loading" data-admin-only="true">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand"><span class="brand-mark">IH</span><span>IntegraHub</span></div>
+        <nav class="sidebar-nav">
+          <a class="nav-link" href="/dashboard/index.html">Dashboard</a>
+          <a class="nav-link" href="/integracoes/index.html">Integrações</a>
+          <a class="nav-link" href="/execucoes/index.html">Execuções</a>
+          <a class="nav-link" href="/logs/index.html">Logs</a>
+          <a class="nav-link" href="/auditoria/index.html">Auditoria</a>
+        </nav>
+      </aside>
+      <div class="content-area">
+        <header class="topbar"><div><h1>IntegraHub</h1><span class="text-muted">Administração de contas e acessos</span></div><div id="api-status" class="api-status offline"><span class="status-dot"></span><span>API Offline</span></div></header>
+        <main class="main-content">
+          <section class="section-block">
+            <div class="section-heading"><div><p class="section-kicker">Administração</p><h2>Visão de acesso</h2></div><button id="refresh-button" class="btn btn-outline-primary" type="button">Atualizar</button></div>
+            <div class="metrics-grid">
+              <article class="metric-card"><span>Usuários cadastrados</span><strong id="total-users">–</strong></article>
+              <article class="metric-card"><span>Usuários logados</span><strong id="logged-in-users">–</strong></article>
+              <article class="metric-card"><span>Usuários online</span><strong id="online-users">–</strong></article>
+              <article class="metric-card"><span>Sessões abertas</span><strong id="open-sessions">–</strong></article>
+              <article class="metric-card"><span>Execuções</span><strong id="total-executions">–</strong></article>
+            </div>
+            <p class="text-muted mt-2">“Logado” significa sessão válida sem logout; “online” significa atividade nos últimos 15 minutos. Uma pessoa pode ter mais de uma sessão.</p>
+          </section>
+          <section class="section-block">
+            <div class="section-heading"><div><p class="section-kicker">Contas</p><h2>Criar usuário</h2></div></div>
+            <form id="create-user-form" class="info-card admin-form">
+              <label>E-mail<input class="form-control" id="new-user-email" type="email" required maxlength="254" autocomplete="off"></label>
+              <label>Senha inicial<input class="form-control" id="new-user-password" type="password" required minlength="12" maxlength="128" autocomplete="new-password"></label>
+              <label>Perfil<select class="form-select" id="new-user-role"><option value="USER">Usuário</option><option value="ADMIN">Administrador</option></select></label>
+              <button class="btn btn-primary" type="submit">Criar conta</button>
+            </form>
+          </section>
+          <section class="section-block">
+            <div class="section-heading"><div><p class="section-kicker">Usuários</p><h2>Contas e dados</h2></div></div>
+            <div id="admin-alert" role="alert"></div>
+            <div class="table-responsive corporate-table">
+              <table class="table table-hover align-middle mb-0 activity-table admin-table">
+                <thead><tr><th>E-mail</th><th>Perfil</th><th>Acesso</th><th>Sessão</th><th>Online</th><th>Última atividade</th><th>Integrações</th><th>Execuções</th><th>Dados e ações</th></tr></thead>
+                <tbody id="users-table-body"><tr><td colspan="9" class="text-center text-muted py-4">Carregando...</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pager"><span id="users-count"></span><button id="previous-page" class="btn btn-outline-secondary btn-sm" type="button">Anterior</button><span id="page-label"></span><button id="next-page" class="btn btn-outline-secondary btn-sm" type="button">Próxima</button></div>
+            <p class="text-muted mt-2">Integrações anteriores ao cadastro de usuários ficam como dados legados, visíveis ao administrador.</p>
+          </section>
+        </main>
+      </div>
+    </div>
+    <div class="modal fade" id="password-modal" tabindex="-1" aria-labelledby="password-modal-title" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="password-modal-title">Redefinir senha</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+        <form id="password-form" class="modal-body">
+          <p id="password-user-email"></p>
+          <label class="form-label" for="reset-password">Nova senha</label>
+          <input id="reset-password" class="form-control" type="password" required minlength="12" maxlength="128" autocomplete="new-password">
+          <p class="text-muted mt-2">As sessões atuais deste usuário serão encerradas.</p>
+          <button class="btn btn-primary" type="submit">Salvar nova senha</button>
+        </form>
+      </div></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/admin.js"></script>
+  </body>
+</html>

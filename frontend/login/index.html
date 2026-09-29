@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Entrar | IntegraHub</title>
+    <link rel="stylesheet" href="/assets/css/style.css">
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-intro" aria-label="Sobre o IntegraHub">
+        <div class="login-brand"><span class="login-brand-mark">IH</span><span>IntegraHub</span></div>
+        <div class="login-intro-copy">
+          <p class="login-intro-kicker">PLATAFORMA DE INTEGRAÇÕES</p>
+          <h2>Integrações<br>sob controle.</h2>
+          <p>Crie, execute e acompanhe suas chamadas HTTP em um só lugar.</p>
+        </div>
+        <p class="login-intro-footer">Visibilidade em cada execução.</p>
+      </section>
+
+      <section class="login-panel" aria-labelledby="login-heading">
+        <div class="login-form-wrap">
+          <div class="login-mobile-brand"><span class="login-brand-mark">IH</span><span>IntegraHub</span></div>
+          <p class="login-form-kicker" id="login-kicker">ACESSO À PLATAFORMA</p>
+          <h1 id="login-heading">Bem-vindo de volta</h1>
+          <p class="login-description" id="login-description">Entre com sua conta para continuar.</p>
+
+          <div id="login-message" class="login-message" role="status" aria-live="polite"></div>
+
+          <form id="login-form">
+            <div class="login-field">
+              <label for="email">E-mail</label>
+              <input class="login-input" id="email" name="email" type="email" autocomplete="username" placeholder="voce@empresa.com" required maxlength="254">
+            </div>
+            <div class="login-field">
+              <label for="password">Senha</label>
+              <div class="login-password-field">
+                <input class="login-input" id="password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required minlength="12" maxlength="128">
+                <button class="login-password-toggle" id="password-toggle" type="button" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>
+              </div>
+            </div>
+            <button class="login-submit" id="login-button" type="submit">Entrar</button>
+          </form>
+
+          <p class="login-help" id="login-help">Precisa de acesso? Peça uma conta ao administrador.</p>
+        </div>
+        <p class="login-panel-footer">IntegraHub · Acesso seguro às suas integrações</p>
+      </section>
+    </main>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/login.js"></script>
+  </body>
+</html>

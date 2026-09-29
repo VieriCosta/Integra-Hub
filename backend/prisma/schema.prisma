@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum IntegrationExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  ERROR
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String
+  role         UserRole      @default(USER)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  integrations Integration[]
+  sessions     AuthSession[]
+  auditEvents  AuditEvent[]
+}
+
+model AuthSession {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([lastSeenAt])
+}
+
+model Integration {
+  id          Int                    @id @default(autoincrement())
+  name        String
+  description String?
+  baseUrl     String
+  method      String
+  headers     Json?
+  queryParams Json?
+  body        Json?
+  status      IntegrationStatus      @default(ACTIVE)
+  ownerId     Int?
+  owner       User?                  @relation(fields: [ownerId], references: [id])
+  executions  IntegrationExecution[]
+  auditEvents AuditEvent[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([ownerId])
+}
+
+model IntegrationExecution {
+  id                 Int                        @id @default(autoincrement())
+  integrationId      Int
+  status             IntegrationExecutionStatus @default(PENDING)
+  httpStatus         Int?
+  requestUrl         String?
+  requestMethod      String?
+  requestHeaders     Json?
+  requestQueryParams Json?
+  requestBody        Json?
+  responseBody       Json?
+  errorMessage       String?
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  durationMs         Int?
+  createdAt          DateTime                   @default(now())
+  integration        Integration                @relation(fields: [integrationId], references: [id])
+  auditEvents        AuditEvent[]
+
+  @@index([integrationId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model AuditEvent {
+  id            Int                   @id @default(autoincrement())
+  action        String
+  integrationId Int
+  executionId   Int?
+  actorId       Int?
+  status        String?
+  httpStatus    Int?
+  durationMs    Int?
+  createdAt     DateTime              @default(now())
+  integration   Integration           @relation(fields: [integrationId], references: [id])
+  execution     IntegrationExecution? @relation(fields: [executionId], references: [id])
+  actor         User?                 @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([integrationId])
+  @@index([executionId])
+  @@index([actorId])
+}
