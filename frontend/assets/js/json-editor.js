@@ -35,14 +35,14 @@ document.querySelectorAll('.json-field').forEach(field => {
     let error = '';
     rows.querySelectorAll('.parameter-row').forEach(row => {
       const [key, value] = row.querySelectorAll('input');
-      if (!key.value.trim()) { if (value.value) error = 'Informe a chave.'; return; }
-      if (Object.hasOwn(result, key.value.trim())) error = 'Chaves duplicadas.';
+      key.setCustomValidity('');
+      if (!key.value.trim()) { if (value.value) { error = 'Informe a chave.'; key.setCustomValidity(error); } return; }
+      if (Object.hasOwn(result, key.value.trim())) { error = 'Chaves duplicadas.'; key.setCustomValidity(error); }
       // Preserve numeric/boolean/object types until the value is actually edited.
       result[key.value.trim()] = value.dataset.originalText === value.value ? JSON.parse(value.dataset.originalValue) : value.value;
     });
     field.value = JSON.stringify(result, null, 2);
     validate();
-    toggle.setCustomValidity(error);
     feedback.textContent = error;
     feedback.style.display = error ? 'block' : '';
   }

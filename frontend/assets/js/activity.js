@@ -96,6 +96,7 @@ async function showActivityDetails(id) {
     detailField(list, "Integração", data.integration?.name);
     detailField(list, "Status", data.status);
     detailField(list, "HTTP", data.httpStatus);
+    if (data.job) detailField(list, 'Tentativas', data.job.attempts);
     detailField(list, "Início", activityDate(data.startedAt));
     detailField(list, "Fim", activityDate(data.finishedAt));
     detailField(list, "Duração", data.durationMs === null ? null : `${data.durationMs} ms`);

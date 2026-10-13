@@ -118,6 +118,7 @@ $(function () {
     currentIntegrationId = null;
     $("#integrationModalLabel").text("Nova integração");
     $("#integration-form")[0].reset();
+    document.querySelectorAll('.json-field').forEach(field => { field.setCustomValidity(''); field.classList.remove('is-invalid'); });
     $("#status").val("ACTIVE");
     $("#modal-alert-container").empty();
     updateBodyAvailability();
@@ -400,11 +401,11 @@ $(function () {
   $("#confirm-execute-button").on("click", confirmExecution);
 
   $tableBody.on("click", ".js-view", function () {
-    openIntegrationModal($(this).data("id"), true);
+    openIntegrationModal($(this).data("id"), true).catch(error => showAlert('#alert-container', error.message, 'danger'));
   });
 
   $tableBody.on("click", ".js-edit", function () {
-    openIntegrationModal($(this).data("id"));
+    openIntegrationModal($(this).data("id")).catch(error => showAlert('#alert-container', error.message, 'danger'));
   });
 
   $tableBody.on("click", ".js-execute", function () {

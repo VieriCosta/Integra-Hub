@@ -3,8 +3,7 @@ const executionRepository = require("../repositories/integrationExecutionReposit
 const { ownerWhere, executionOwnerWhere } = require("../utils/accessScope");
 
 function getTodayRange() {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' }) + 'T00:00:00-03:00');
 
   const endOfDay = new Date(startOfDay);
   endOfDay.setDate(endOfDay.getDate() + 1);
@@ -31,7 +30,7 @@ async function getDashboardMetrics(user, ownerIdValue, daysValue = 7) {
 
   const prisma = require('../config/prisma');
   // Calendar days in Fortaleza, independent of the server timezone.
-  const today = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' }) + 'T00:00:00-03:00');
+  const today = startOfDay;
   const since = new Date(today.getTime() - (days - 1) * 86400000);
   const periodWhere = { ...executionScope, createdAt: { gte: since } };
   const [aggregate, counts, latestErrors, daily] = await Promise.all([

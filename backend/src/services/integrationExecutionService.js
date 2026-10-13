@@ -1,6 +1,5 @@
 const integrationRepository = require("../repositories/integrationRepository");
 const executionRepository = require("../repositories/integrationExecutionRepository");
-const { executeHttpRequest } = require("./httpClientService");
 const { AppError } = require("../utils/AppError");
 const { sanitizeExecution } = require("../utils/headerMasker");
 const { validateDestinationUrl } = require("../utils/urlValidator");
@@ -17,16 +16,6 @@ function parseId(id) {
   }
 
   return parsedId;
-}
-
-function buildRequestSnapshot(integration) {
-  return {
-    requestUrl: integration.baseUrl,
-    requestMethod: integration.method,
-    requestHeaders: integration.headers || null,
-    requestQueryParams: integration.queryParams || null,
-    requestBody: ["POST", "PUT", "PATCH"].includes(integration.method) ? integration.body : null
-  };
 }
 
 async function executeIntegration(id, user) {

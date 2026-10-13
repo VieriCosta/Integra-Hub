@@ -129,6 +129,7 @@ model ExecutionJob {
   actorId Int?
   state String @default("PENDING")
   attempts Int @default(0)
+  requestFingerprint String?
   runAt DateTime @default(now())
   claimedAt DateTime?
   finishedAt DateTime?

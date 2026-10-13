@@ -32,7 +32,10 @@ async function save(id, payload, user) {
   } catch (error) { if (error.code === 'P2002') throw new AppError('Já existe um ambiente com esse nome.', 409); throw error; }
 }
 async function resolveIntegration(integration) {
-  if (!integration.environmentId) return { request: integration, variables: {} };
+  if (!integration.environmentId) {
+    if (/\{\{[A-Z][A-Z0-9_]*\}\}/.test(JSON.stringify([integration.baseUrl, integration.headers, integration.queryParams, integration.body]))) throw new AppError('Selecione um ambiente para usar variáveis.', 400);
+    return { request: integration, variables: {} };
+  }
   const environment = await prisma.environment.findUnique({ where: { id: integration.environmentId } });
   if (!environment || environment.ownerId !== integration.ownerId) throw new AppError('O ambiente deve pertencer ao proprietário da integração.', 400);
   const variables = vault.decryptVariables(environment.encryptedVariables);

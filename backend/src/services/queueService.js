@@ -13,7 +13,7 @@ async function enqueue(integration, actorId, tx = prisma) {
     integrationId: integration.id, status: 'PENDING',
     ...sanitizeExecution({ requestUrl: integration.baseUrl, requestMethod: integration.method, requestHeaders: integration.headers, requestQueryParams: integration.queryParams, requestBody: integration.body })
   } });
-  await tx.executionJob.create({ data: { integrationId: integration.id, executionId: execution.id, actorId } });
+  await tx.executionJob.create({ data: { integrationId: integration.id, executionId: execution.id, actorId, requestFingerprint: await require('../utils/requestFingerprint').requestFingerprint(integration, tx) } });
   await tx.auditEvent.create({ data: { integrationId: integration.id, executionId: execution.id, actorId, action: 'EXECUTION_QUEUED', status: 'PENDING' } });
   return { ...execution, integration: { id: integration.id, name: integration.name } };
 }
@@ -34,7 +34,9 @@ async function runJob(job) {
   const integration = await prisma.integration.findUnique({ where: { id: job.integrationId }, include: { owner: { select: { isActive: true } } } });
   let result;
   let variables = {};
-  if (!integration || integration.status !== 'ACTIVE' || integration.owner?.isActive === false) {
+  if (integration && job.requestFingerprint && job.requestFingerprint !== await require('../utils/requestFingerprint').requestFingerprint(integration)) {
+    result = { status: 'ERROR', httpStatus: null, errorMessage: 'Configuração ou credenciais alteradas após entrar na fila. Execute novamente.', finishedAt: new Date(), durationMs: 0 };
+  } else if (!integration || integration.status !== 'ACTIVE' || integration.owner?.isActive === false) {
     result = { status: 'ERROR', httpStatus: null, errorMessage: 'Integração ou proprietário inativo.', finishedAt: new Date(), durationMs: 0 };
   } else {
     await prisma.integrationExecution.update({ where: { id: job.executionId }, data: { status: 'RUNNING', startedAt: new Date() } });

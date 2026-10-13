@@ -1,5 +1,6 @@
 let environmentItems = [];
 let environmentId = null;
+const environmentOwner = new URLSearchParams(location.search).get('ownerId') || '';
 function environmentMessage(message, error = false) {
   const element = document.getElementById('environment-alert'); element.textContent = message; element.className = error ? 'alert alert-danger' : message ? 'alert alert-success' : '';
 }
@@ -12,7 +13,7 @@ function editEnvironment(item = null) {
 }
 async function loadEnvironments() {
   try {
-    const { data } = await requestJson('/environments'); environmentItems = data;
+    const { data } = await requestJson(`/environments${environmentOwner ? `?ownerId=${encodeURIComponent(environmentOwner)}` : ''}`); environmentItems = data;
     const list = document.getElementById('environment-list'); list.replaceChildren();
     if (!data.length) list.textContent = 'Nenhum ambiente cadastrado.';
     for (const item of data) {

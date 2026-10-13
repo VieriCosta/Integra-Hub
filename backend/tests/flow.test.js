@@ -55,6 +55,7 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
   let userId;
   let environmentId;
   const oldVaultKey = process.env.CREDENTIAL_ENCRYPTION_KEY;
+  const oldConcurrency = process.env.EXECUTION_CONCURRENCY;
   process.env.CREDENTIAL_ENCRYPTION_KEY = require('node:crypto').randomBytes(32).toString('base64');
   axios.defaults.adapter = async (config) => {
     assert.equal(config.maxContentLength, 1024 * 1024);
@@ -337,6 +338,28 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
     assert.equal((await request('/executions?from=invalid')).status, 400);
     assert.equal((await request('/executions?from=2026-10-13&to=2026-10-12')).status, 400);
     assert.equal((await request('/executions?from=2099-01-01')).body.data.total, 0);
+    const mutationIntegration = await prisma.integration.findUnique({ where: { id: postId } });
+    let inFlight = 0;
+    let peak = 0;
+    let mutationCalls = 0;
+    axios.defaults.adapter = async config => {
+      mutationCalls++; inFlight++; peak = Math.max(peak, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 40)); inFlight--;
+      return { status: 200, data: { ok: true }, headers: {}, config };
+    };
+    process.env.EXECUTION_CONCURRENCY = '2';
+    for (let index = 0; index < 4; index++) await prisma.$transaction(tx => queue.enqueue(mutationIntegration, adminId, tx));
+    await queue.tick(); await queue.stopWorker();
+    assert.equal(mutationCalls, 2);
+    await queue.tick(); await queue.stopWorker();
+    assert.equal(mutationCalls, 4); assert.equal(peak, 2);
+    const changedRequest = await prisma.$transaction(tx => queue.enqueue(mutationIntegration, adminId, tx));
+    await prisma.integration.update({ where: { id: postId }, data: { baseUrl: 'https://1.1.1.1/changed' } });
+    await queue.tick(); await queue.stopWorker();
+    const canceledRequest = await prisma.integrationExecution.findUnique({ where: { id: changedRequest.id } });
+    assert.equal(canceledRequest.status, 'ERROR');
+    assert.match(canceledRequest.errorMessage, /alteradas após/);
+    assert.equal(mutationCalls, 4);
   } finally {
     await require('../src/services/queueService').stopWorker();
     axios.defaults.adapter = oldAdapter;
@@ -349,6 +372,7 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
     }
     if (environmentId) await prisma.environment.delete({ where: { id: environmentId } });
     if (oldVaultKey === undefined) delete process.env.CREDENTIAL_ENCRYPTION_KEY; else process.env.CREDENTIAL_ENCRYPTION_KEY = oldVaultKey;
+    if (oldConcurrency === undefined) delete process.env.EXECUTION_CONCURRENCY; else process.env.EXECUTION_CONCURRENCY = oldConcurrency;
     await prisma.authSession.deleteMany({ where: { userId: { in: [adminId, userId].filter(Boolean) } } });
     await prisma.user.deleteMany({ where: { id: { in: [adminId, userId].filter(Boolean) } } });
     server.closeAllConnections();

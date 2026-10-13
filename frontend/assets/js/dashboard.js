@@ -1,4 +1,6 @@
+let dashboardRequest = 0;
 async function loadDashboardPage() {
+  const currentRequest = ++dashboardRequest;
   const ownerId = new URLSearchParams(location.search).get("ownerId") || "";
   if (ownerId) {
     for (const link of document.querySelectorAll(".metric-link")) {
@@ -23,6 +25,7 @@ async function loadDashboardPage() {
 
   try {
     const { data } = await carregarDashboard(ownerId, Number(document.getElementById('dashboard-period').value));
+    if (currentRequest !== dashboardRequest) return;
     document.getElementById('period-summary').textContent = `Sucesso: ${data.successRate === null ? 'Sem execuções finalizadas' : data.successRate + '%'} · Tempo médio: ${data.averageDurationMs} ms`;
     const chart = document.getElementById('daily-chart');
     chart.replaceChildren();
@@ -31,6 +34,8 @@ async function loadDashboardPage() {
       const column = document.createElement('div');
       column.className = 'daily-column';
       column.title = `${day.date}: ${day.success} sucessos, ${day.error} erros`;
+      column.setAttribute('role', 'img');
+      column.setAttribute('aria-label', column.title);
       for (const status of ['error', 'success']) {
         const bar = document.createElement('div');
         bar.className = `daily-bar ${status}`;

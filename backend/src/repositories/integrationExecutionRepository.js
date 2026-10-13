@@ -109,6 +109,7 @@ async function findById(id, scope = {}) {
   return prisma.integrationExecution.findFirst({
     where: { id, ...scope },
     include: {
+      job: { select: { attempts: true, state: true, runAt: true } },
       integration: {
         select: {
           id: true,

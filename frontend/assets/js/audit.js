@@ -6,6 +6,8 @@ let auditPage = 1;
 let auditRequest = 0;
 
 const actionLabels = {
+  EXECUTION_QUEUED: 'Execução na fila',
+  AUTOMATION_UPDATED: 'Automação alterada',
   INTEGRATION_EXISTING: "Integração já existente",
   EXECUTION_EXISTING: "Execução já existente",
   INTEGRATION_CREATED: "Integração cadastrada",
