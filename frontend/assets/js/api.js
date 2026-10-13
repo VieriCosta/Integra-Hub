@@ -66,8 +66,8 @@ async function buscarExecucao(id) {
   return requestJson(`/executions/${id}`);
 }
 
-async function carregarDashboard(ownerId = "") {
-  const query = ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : "";
+async function carregarDashboard(ownerId = "", days = 7) {
+  const query = `?days=${days}${ownerId ? `&ownerId=${encodeURIComponent(ownerId)}` : ''}`;
   return requestJson(`/dashboard${query}`);
 }
 

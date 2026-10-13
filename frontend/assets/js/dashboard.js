@@ -22,7 +22,36 @@ async function loadDashboardPage() {
   }
 
   try {
-    const { data } = await carregarDashboard(ownerId);
+    const { data } = await carregarDashboard(ownerId, Number(document.getElementById('dashboard-period').value));
+    document.getElementById('period-summary').textContent = `Sucesso: ${data.successRate === null ? 'Sem execuções finalizadas' : data.successRate + '%'} · Tempo médio: ${data.averageDurationMs} ms`;
+    const chart = document.getElementById('daily-chart');
+    chart.replaceChildren();
+    const max = Math.max(1, ...data.daily.map(day => day.success + day.error));
+    for (const day of data.daily) {
+      const column = document.createElement('div');
+      column.className = 'daily-column';
+      column.title = `${day.date}: ${day.success} sucessos, ${day.error} erros`;
+      for (const status of ['error', 'success']) {
+        const bar = document.createElement('div');
+        bar.className = `daily-bar ${status}`;
+        bar.style.height = `${day[status] / max * 120}px`;
+        column.append(bar);
+      }
+      const label = document.createElement('small');
+      label.textContent = `${day.date.slice(8)}/${day.date.slice(5, 7)}`;
+      column.append(label);
+      chart.append(column);
+    }
+    const failures = document.getElementById('latest-errors');
+    failures.replaceChildren();
+    if (!data.latestErrors.length) failures.textContent = 'Nenhuma falha no período.';
+    for (const item of data.latestErrors) {
+      const link = document.createElement('a');
+      link.className = 'd-block py-2';
+      link.href = `/execucoes/index.html?executionId=${item.id}${ownerId ? `&ownerId=${encodeURIComponent(ownerId)}` : ''}`;
+      link.textContent = `${item.integration.name} · HTTP ${item.httpStatus ?? '—'} · ${new Date(item.createdAt).toLocaleString('pt-BR')}`;
+      failures.append(link);
+    }
     document.getElementById("metric-integrations").textContent = data.totalIntegrations;
     document.getElementById("metric-executions").textContent = data.executionsToday;
     document.getElementById("metric-success").textContent = data.successToday;
@@ -34,3 +63,4 @@ async function loadDashboardPage() {
 }
 
 sessionReady.then(loadDashboardPage).catch(() => {});
+document.getElementById('dashboard-period').addEventListener('change', loadDashboardPage);

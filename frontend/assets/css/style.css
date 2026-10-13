@@ -820,3 +820,7 @@ body.auth-loading .app-shell {
     flex-direction: column;
   }
 }
+.daily-chart { display:flex; align-items:flex-end; gap:10px; overflow-x:auto; padding:20px 0; min-height:160px; }
+.daily-column { display:flex; flex-direction:column; justify-content:flex-end; min-width:32px; flex:1; text-align:center; }
+.daily-bar.success { background:#198754; }
+.daily-bar.error { background:#dc3545; }

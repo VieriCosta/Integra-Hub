@@ -30,6 +30,10 @@
               <div><p class="section-kicker">Dashboard</p><h2>Visão geral</h2></div>
             </div>
             <div id="dashboard-alert"></div>
+            <label for="dashboard-period" class="form-label">Período dos gráficos</label>
+            <select id="dashboard-period" class="form-select mb-3"><option value="7">Últimos 7 dias</option><option value="14">Últimos 14 dias</option><option value="30">Últimos 30 dias</option></select>
+            <div class="info-card mb-3"><strong id="period-summary"></strong><div id="daily-chart" class="daily-chart" aria-label="Execuções por dia"></div><small>Verde: sucessos · Vermelho: erros</small></div>
+            <div class="info-card mb-3"><h3>Últimas falhas</h3><div id="latest-errors"></div></div>
             <div class="metrics-grid">
               <a class="metric-card metric-link" href="/integracoes/index.html"><span>Integrações</span><strong id="metric-integrations">–</strong><small>Ver integrações →</small></a>
               <a class="metric-card metric-link" href="/execucoes/index.html"><span>Execuções hoje</span><strong id="metric-executions">–</strong><small>Ver execuções →</small></a>
