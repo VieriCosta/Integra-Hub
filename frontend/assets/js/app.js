@@ -278,6 +278,8 @@ $(function () {
     }
 
     $("#integration-form :input").prop("disabled", readOnly);
+    updateBodyAvailability();
+    if (readOnly) $('#body').prop('disabled', true);
     $("#save-integration-button").toggle(!readOnly);
     integrationModal.show();
   }
@@ -381,6 +383,7 @@ $(function () {
   $("#new-integration-button").on("click", function () {
     resetIntegrationForm();
     $("#integration-form :input").prop("disabled", false);
+    updateBodyAvailability();
     $("#save-integration-button").show();
     integrationModal.show();
   });
