@@ -7,6 +7,32 @@ const detailsModal = new bootstrap.Modal(document.getElementById("details-modal"
 const selectedOwnerId = new URLSearchParams(location.search).get("ownerId") || "";
 let activityPage = 1;
 let activityRequest = 0;
+const comparedExecutions = new Set();
+const tools = document.createElement('div');
+tools.className = 'd-flex flex-wrap gap-3 mb-3';
+for (const [id, text] of [['date-from', 'De'], ['date-to', 'Até']]) {
+  const label = document.createElement('label'); label.textContent = text;
+  const input = document.createElement('input'); input.type = 'datetime-local'; input.id = id; input.className = 'form-control';
+  input.addEventListener('change', () => { activityPage = 1; loadActivity(); }); label.append(input); tools.append(label);
+}
+const compareButton = document.createElement('button');
+compareButton.type = 'button'; compareButton.className = 'btn btn-outline-primary align-self-end'; compareButton.textContent = 'Comparar 2 execuções'; compareButton.disabled = true;
+tools.append(compareButton);
+activityBody.closest('.table-responsive').before(tools);
+compareButton.addEventListener('click', async () => {
+  try {
+    const executions = await Promise.all([...comparedExecutions].map(id => buscarExecucao(id)));
+    const [before, after] = executions.map(result => result.data).sort((a, b) => a.id - b.id);
+    if (before.integrationId !== after.integrationId) throw new Error('Selecione duas execuções da mesma integração.');
+    const content = document.createElement('div');
+    const summary = document.createElement('p'); summary.textContent = `#${before.id} → #${after.id} · HTTP ${before.httpStatus ?? '—'} → ${after.httpStatus ?? '—'} · Duração ${before.durationMs ?? '—'} → ${after.durationMs ?? '—'} ms`;
+    content.append(summary);
+    const differences = responseDifferences(before.responseBody, after.responseBody);
+    const pre = document.createElement('pre'); pre.className = 'json-preview';
+    pre.textContent = differences.length ? differences.map(diff => `${diff.path}\nAntes: ${JSON.stringify(diff.before) ?? '(ausente)'}\nDepois: ${JSON.stringify(diff.after) ?? '(ausente)'}`).join('\n\n') : 'Respostas idênticas.';
+    content.append(pre); document.getElementById('details-content').replaceChildren(content); detailsModal.show();
+  } catch (error) { activityMessage(error.message, true); }
+});
 
 if (statusFilter) {
   const initialStatus = new URLSearchParams(location.search).get("status");
@@ -106,6 +132,12 @@ function renderActivity(result) {
     button.textContent = "Detalhes";
     button.addEventListener("click", () => showActivityDetails(item.id));
     action.append(button);
+    const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'form-check-input ms-2'; check.setAttribute('aria-label', `Comparar execução ${item.id}`); check.checked = comparedExecutions.has(item.id);
+    check.addEventListener('change', () => {
+      if (check.checked && comparedExecutions.size >= 2) { check.checked = false; activityMessage('Selecione no máximo duas execuções.', true); return; }
+      if (check.checked) comparedExecutions.add(item.id); else comparedExecutions.delete(item.id);
+      compareButton.disabled = comparedExecutions.size !== 2;
+    }); action.append(check);
     row.append(action);
     activityBody.append(row);
   }
@@ -125,7 +157,9 @@ async function loadActivity() {
       page: activityPage,
       status: isLogsView ? "ERROR" : statusFilter.value,
       integrationId: integrationFilter.value,
-      ownerId: selectedOwnerId
+      ownerId: selectedOwnerId,
+      from: document.getElementById('date-from').value ? new Date(document.getElementById('date-from').value).toISOString() : '',
+      to: document.getElementById('date-to').value ? new Date(document.getElementById('date-to').value).toISOString() : ''
     });
     if (currentRequest === activityRequest) renderActivity(data);
   } catch (error) {
@@ -160,4 +194,6 @@ sessionReady.then(() => {
   verificarApi().then(() => activityStatus(true)).catch(() => activityStatus(false));
   loadActivityIntegrations();
   loadActivity();
+  const executionId = new URLSearchParams(location.search).get('executionId');
+  if (executionId && /^\d+$/.test(executionId)) showActivityDetails(executionId);
 }).catch(() => {});

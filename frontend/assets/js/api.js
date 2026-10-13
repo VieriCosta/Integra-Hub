@@ -71,11 +71,13 @@ async function carregarDashboard(ownerId = "", days = 7) {
   return requestJson(`/dashboard${query}`);
 }
 
-async function listarExecucoes({ page = 1, pageSize = 20, status = "", integrationId = "", ownerId = "" } = {}) {
+async function listarExecucoes({ page = 1, pageSize = 20, status = "", integrationId = "", ownerId = "", from = '', to = '' } = {}) {
   const query = new URLSearchParams({ page, pageSize });
   if (status) query.set("status", status);
   if (integrationId) query.set("integrationId", integrationId);
   if (ownerId) query.set("ownerId", ownerId);
+  if (from) query.set('from', from);
+  if (to) query.set('to', to);
   return requestJson(`/executions?${query}`);
 }
 

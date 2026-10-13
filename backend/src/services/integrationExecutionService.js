@@ -94,14 +94,14 @@ async function listExecutionsByIntegration(id, pageValue = 1, pageSizeValue = 20
   return { items, total, page, pageSize };
 }
 
-async function listExecutions(pageValue = 1, pageSizeValue = 20, statusValue, integrationIdValue, user, ownerIdValue) {
+async function listExecutions(pageValue = 1, pageSizeValue = 20, statusValue, integrationIdValue, user, ownerIdValue, from, to) {
   const { page, pageSize } = parsePagination(pageValue, pageSizeValue);
   const status = statusValue ? String(statusValue).toUpperCase() : null;
   if (status && !EXECUTION_STATUSES.has(status)) {
     throw new AppError("Status de execução inválido.", 400);
   }
   const integrationId = integrationIdValue ? parseId(integrationIdValue) : null;
-  const scope = executionOwnerWhere(user, ownerIdValue);
+  const scope = { ...executionOwnerWhere(user, ownerIdValue), ...require('../utils/dateRange').dateRange(from, to) };
   const [items, total] = await Promise.all([
     executionRepository.findAll(page, pageSize, status, integrationId, scope),
     executionRepository.countAll(status, integrationId, scope)

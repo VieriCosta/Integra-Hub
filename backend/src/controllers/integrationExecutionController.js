@@ -45,7 +45,7 @@ async function listExecutions(req, res, next) {
   try {
     const executions = await integrationExecutionService.listExecutions(
       req.query.page, req.query.pageSize, req.query.status, req.query.integrationId,
-      req.user, req.query.ownerId
+      req.user, req.query.ownerId, req.query.from, req.query.to
     );
     res.json({ success: true, data: executions });
   } catch (error) {
