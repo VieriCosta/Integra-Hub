@@ -53,6 +53,9 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
   let adminCookie;
   let adminId;
   let userId;
+  let environmentId;
+  const oldVaultKey = process.env.CREDENTIAL_ENCRYPTION_KEY;
+  process.env.CREDENTIAL_ENCRYPTION_KEY = require('node:crypto').randomBytes(32).toString('base64');
   axios.defaults.adapter = async (config) => {
     assert.equal(config.maxContentLength, 1024 * 1024);
     assert.ok(config.timeout <= 30000);
@@ -265,6 +268,75 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
     for (const path of ["/executions?page=0", "/executions?status=UNKNOWN", "/audit?pageSize=101", "/audit?action=UNKNOWN"]) {
       assert.equal((await request(path)).status, 400, path);
     }
+    const environment = await request('/environments', 'POST', { name: 'Test credentials', stage: 'STAGING', variables: { BASE_URL: 'https://1.1.1.1', API_TOKEN: 'protected-test-credential' } });
+    assert.equal(environment.status, 201);
+    environmentId = environment.body.data.id;
+    assert.equal(environment.body.data.variables.API_TOKEN, '********');
+    const storedEnvironment = await prisma.environment.findUnique({ where: { id: environmentId } });
+    assert.ok(!storedEnvironment.encryptedVariables.includes('protected-test-credential'));
+    assert.equal((await request(`/environments/${environmentId}`, 'PUT', environment.body.data)).status, 200);
+    assert.equal(require('../src/utils/secretVault').decryptVariables((await prisma.environment.findUnique({ where: { id: environmentId } })).encryptedVariables).API_TOKEN, 'protected-test-credential');
+    await request(`/admin/users/${userId}`, 'PATCH', { isActive: true });
+    const featureLogin = await request('/auth/login', 'POST', { email: 'user@example.test', password: 'user-changed-5678' }, null);
+    assert.equal(featureLogin.status, 200);
+    assert.equal((await request('/environments', 'GET', undefined, featureLogin.cookie)).body.data.length, 0);
+    assert.equal((await request(`/environments/${environmentId}`, 'PUT', environment.body.data, featureLogin.cookie)).status, 404);
+    assert.equal((await request('/integrations', 'POST', { name: 'Cross owner', method: 'GET', baseUrl: '{{BASE_URL}}/test', environmentId }, featureLogin.cookie)).status, 400);
+    assert.equal((await request(`/automation/integrations/${createdIds[0]}`, 'PUT', { scheduleMinutes: 1, maxRetries: 0, failureThreshold: 1, slowThresholdMs: 100 }, featureLogin.cookie)).status, 404);
+    const templated = await request('/integrations', 'POST', { name: 'Templated API', method: 'GET', baseUrl: '{{BASE_URL}}/echo', headers: { Authorization: 'Bearer {{API_TOKEN}}' }, environmentId });
+    assert.equal(templated.status, 201);
+    const templatedId = templated.body.data.id; createdIds.push(templatedId);
+    axios.defaults.adapter = async config => {
+      assert.equal(config.url, 'https://1.1.1.1/echo');
+      assert.equal(config.headers.Authorization, 'Bearer protected-test-credential');
+      return { status: 200, data: { echo: 'protected-test-credential' }, headers: {}, config };
+    };
+    const queued = await request(`/integrations/${templatedId}/execute`, 'POST');
+    let completed;
+    for (let count = 0; count < 100; count++) {
+      completed = await request(`/executions/${queued.body.data.id}`);
+      if (completed.body.data.status === 'SUCCESS') break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(completed.body.data.status, 'SUCCESS');
+    assert.equal(completed.body.data.responseBody.echo, '********');
+    const duplicate = await request(`/integrations/${templatedId}/duplicate`, 'POST');
+    assert.equal(duplicate.status, 201); createdIds.push(duplicate.body.data.id);
+    assert.equal(duplicate.body.data.environmentId, environmentId);
+    assert.equal(duplicate.body.data.status, 'INACTIVE');
+    const getSettings = { scheduleMinutes: 1, maxRetries: 1, failureThreshold: 1, slowThresholdMs: 100 };
+    assert.equal((await request(`/automation/integrations/${templatedId}`, 'PUT', getSettings)).status, 200);
+    const post = await request('/integrations', 'POST', { name: 'Never retry mutation', method: 'POST', baseUrl: 'https://1.1.1.1/mutation' });
+    const postId = post.body.data.id; createdIds.push(postId);
+    assert.equal((await request(`/automation/integrations/${postId}`, 'PUT', getSettings)).status, 400);
+    await require('../src/services/queueService').stopWorker();
+    let calls = 0;
+    axios.defaults.adapter = async config => { calls++; return { status: 503, data: { error: 'transient' }, headers: {}, config }; };
+    // Tick a due schedule twice and verify it only queues one job.
+    await prisma.integration.update({ where: { id: templatedId }, data: { nextRunAt: new Date(Date.now() - 1000) } });
+    const queue = require('../src/services/queueService');
+    await Promise.all([queue.tick(), queue.tick()]);
+    await queue.tick();
+    await queue.stopWorker();
+    const retry = await prisma.executionJob.findFirst({ where: { integrationId: templatedId, state: 'PENDING' } });
+    assert.ok(retry);
+    assert.equal(retry.attempts, 1);
+    assert.equal(await prisma.executionJob.count({ where: { integrationId: templatedId } }), 2);
+    await prisma.executionJob.update({ where: { id: retry.id }, data: { runAt: new Date(Date.now() - 1000) } });
+    await queue.tick(); await queue.stopWorker();
+    const failed = await prisma.executionJob.findUnique({ where: { id: retry.id }, include: { execution: true } });
+    assert.equal(failed.state, 'DONE'); assert.equal(failed.attempts, 2); assert.equal(calls, 2);
+    assert.equal(failed.execution.status, 'ERROR');
+    const overview = await request('/automation');
+    const failureAlert = overview.body.data.alerts.find(item => item.integrationId === templatedId && item.kind === 'FAILURES');
+    assert.ok(failureAlert);
+    assert.equal((await request(`/automation/alerts/${failureAlert.id}/acknowledge`, 'POST', undefined, featureLogin.cookie)).status, 404);
+    assert.equal((await request(`/automation/alerts/${failureAlert.id}/acknowledge`, 'POST')).status, 200);
+    assert.equal((await request('/dashboard?days=14')).body.data.daily.length, 14);
+    assert.equal((await request('/dashboard?days=999')).status, 400);
+    assert.equal((await request('/executions?from=invalid')).status, 400);
+    assert.equal((await request('/executions?from=2026-10-13&to=2026-10-12')).status, 400);
+    assert.equal((await request('/executions?from=2099-01-01')).body.data.total, 0);
   } finally {
     await require('../src/services/queueService').stopWorker();
     axios.defaults.adapter = oldAdapter;
@@ -275,6 +347,8 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
       await prisma.integrationExecution.deleteMany({ where: { integrationId: id } });
       await prisma.integration.delete({ where: { id } });
     }
+    if (environmentId) await prisma.environment.delete({ where: { id: environmentId } });
+    if (oldVaultKey === undefined) delete process.env.CREDENTIAL_ENCRYPTION_KEY; else process.env.CREDENTIAL_ENCRYPTION_KEY = oldVaultKey;
     await prisma.authSession.deleteMany({ where: { userId: { in: [adminId, userId].filter(Boolean) } } });
     await prisma.user.deleteMany({ where: { id: { in: [adminId, userId].filter(Boolean) } } });
     server.closeAllConnections();

@@ -56,7 +56,7 @@ function validateIntegrationPayload(payload) {
     throw new AppError("A URL da integração é obrigatória.", 400);
   }
 
-  if (!validateDestinationUrl(baseUrl)) {
+  if (!validateDestinationUrl(baseUrl) && !(payload.environmentId && /\{\{[A-Z][A-Z0-9_]*\}\}/.test(baseUrl))) {
     throw new AppError("A URL da integração é inválida. Use apenas http:// ou https://.", 400);
   }
 
@@ -73,6 +73,7 @@ function validateIntegrationPayload(payload) {
   }
 
   return {
+    environmentId: payload.environmentId ? parseId(payload.environmentId) : null,
     name,
     description: description || null,
     baseUrl,
@@ -108,6 +109,7 @@ async function createIntegration(payload, user) {
     }
   }
   const data = { ...validateIntegrationPayload(payload), ownerId };
+  await require('./environmentService').validateBinding(data, ownerId);
   return sanitizeIntegration(await integrationRepository.create(data, user.id));
 }
 
@@ -126,6 +128,8 @@ async function updateIntegration(id, payload, user) {
     throw new AppError("Informe a URL completa ao alterá-la.", 400);
   }
   const data = validateIntegrationPayload(merged);
+  await require('./environmentService').validateBinding(data, previous.ownerId);
+  if (previous.method !== data.method && data.method !== 'GET') data.maxRetries = 0;
   return sanitizeIntegration(await integrationRepository.update(integrationId, data, user.id));
 }
 
@@ -133,6 +137,7 @@ module.exports = {
   async duplicateIntegration(id, user) {
     const previous = await integrationRepository.findById(parseId(id), ownerWhere(user));
     if (!previous) throw new AppError('Integração não encontrada.', 404);
+    if (previous.environmentId && previous.ownerId !== user.id) throw new AppError('Duplique integrações com ambiente apenas na conta proprietária.', 400);
     const data = validateIntegrationPayload({ ...previous, name: `${previous.name} (cópia)`, status: 'INACTIVE' });
     return sanitizeIntegration(await integrationRepository.create({ ...data, ownerId: user.id }, user.id));
   },

@@ -4,8 +4,9 @@ const { executeHttpRequest } = require('./httpClientService');
 const { canRetry } = require('../utils/retryPolicy');
 let timer;
 let ticking = false;
+let tickTask = Promise.resolve();
 const active = new Set();
-function concurrency() { return Math.max(1, Math.min(10, Number(process.env.EXECUTION_CONCURRENCY) || 3)); }
+function concurrency() { return Math.max(1, Math.min(10, Math.floor(Number(process.env.EXECUTION_CONCURRENCY) || 3))); }
 
 async function enqueue(integration, actorId, tx = prisma) {
   const execution = await tx.integrationExecution.create({ data: {
@@ -17,13 +18,13 @@ async function enqueue(integration, actorId, tx = prisma) {
   return { ...execution, integration: { id: integration.id, name: integration.name } };
 }
 async function createAlerts(tx, integration, result) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${integration.id})`;
   const recent = await tx.integrationExecution.findMany({ where: { integrationId: integration.id, status: { in: ['SUCCESS', 'ERROR'] } }, orderBy: { id: 'desc' }, take: integration.failureThreshold });
   const conditions = [
     ['FAILURES', recent.length >= integration.failureThreshold && recent.every(item => item.status === 'ERROR'), `${integration.failureThreshold} falhas consecutivas.`],
     ['SLOW', result.durationMs >= integration.slowThresholdMs, `Execução levou ${result.durationMs} ms (limite ${integration.slowThresholdMs} ms).`]
   ];
   // Serialize alert creation for the same integration across workers.
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${integration.id})`;
   for (const [kind, triggered, message] of conditions) {
     if (!triggered) continue;
     if (!await tx.integrationAlert.findFirst({ where: { integrationId: integration.id, kind, acknowledgedAt: null } })) await tx.integrationAlert.create({ data: { integrationId: integration.id, kind, message } });
@@ -32,11 +33,18 @@ async function createAlerts(tx, integration, result) {
 async function runJob(job) {
   const integration = await prisma.integration.findUnique({ where: { id: job.integrationId }, include: { owner: { select: { isActive: true } } } });
   let result;
+  let variables = {};
   if (!integration || integration.status !== 'ACTIVE' || integration.owner?.isActive === false) {
     result = { status: 'ERROR', httpStatus: null, errorMessage: 'Integração ou proprietário inativo.', finishedAt: new Date(), durationMs: 0 };
   } else {
     await prisma.integrationExecution.update({ where: { id: job.executionId }, data: { status: 'RUNNING', startedAt: new Date() } });
-    result = await executeHttpRequest(integration);
+    try {
+      const resolved = await require('./environmentService').resolveIntegration(integration);
+      variables = resolved.variables;
+      result = await executeHttpRequest(resolved.request);
+    } catch {
+      result = { status: 'ERROR', httpStatus: null, responseBody: null, errorMessage: 'Não foi possível resolver as credenciais do ambiente.', finishedAt: new Date(), durationMs: 0 };
+    }
   }
   if (integration && canRetry(integration.method, result, job.attempts, integration.maxRetries)) {
     await prisma.$transaction([
@@ -46,7 +54,8 @@ async function runJob(job) {
     return;
   }
   await prisma.$transaction(async tx => {
-    await tx.integrationExecution.update({ where: { id: job.executionId }, data: { ...result, responseBody: sanitizeExecution({ responseBody: result.responseBody ?? null }).responseBody } });
+    const safeResult = require('../utils/secretVault').redactKnownSecrets(result.responseBody ?? null, variables);
+    await tx.integrationExecution.update({ where: { id: job.executionId }, data: { ...result, responseBody: sanitizeExecution({ responseBody: safeResult }).responseBody } });
     await tx.executionJob.update({ where: { id: job.id }, data: { state: 'DONE', finishedAt: new Date() } });
     await tx.auditEvent.create({ data: { integrationId: job.integrationId, executionId: job.executionId, actorId: job.actorId, action: 'EXECUTION_FINISHED', status: result.status, httpStatus: result.httpStatus, durationMs: result.durationMs } });
     if (integration) await createAlerts(tx, integration, result);
@@ -91,8 +100,8 @@ async function tick() {
 }
 function startWorker() {
   if (timer) return;
-  const run = () => tick().catch(error => console.error('Fila indisponível:', error.code || error.name));
+  const run = () => { tickTask = tick().catch(error => console.error('Fila indisponível:', error.code || error.name)); };
   timer = setInterval(run, 1000); timer.unref(); run();
 }
-async function stopWorker() { clearInterval(timer); timer = null; await Promise.allSettled([...active]); }
+async function stopWorker() { clearInterval(timer); timer = null; await tickTask; await Promise.allSettled([...active]); }
 module.exports = { enqueue, tick, startWorker, stopWorker };

@@ -20,7 +20,7 @@
           <a class="nav-link" href="/execucoes/index.html">Execuções</a>
           <a class="nav-link" href="/logs/index.html">Logs</a>
           <a class="nav-link" href="/auditoria/index.html">Auditoria</a>
-        <a class="nav-link" href="/automacao/index.html">Automa??o</a></nav>
+        <a class="nav-link" href="/automacao/index.html">Automa??o</a><a class="nav-link" href="/ambientes/index.html">Ambientes</a></nav>
       </aside>
 
       <div class="content-area">
@@ -117,7 +117,12 @@
                 </div>
                 <div class="col-12">
                   <label for="baseUrl" class="form-label">URL</label>
-                  <input type="url" class="form-control" id="baseUrl" name="baseUrl" placeholder="https://api.exemplo.com/clientes" required>
+                  <input type="text" inputmode="url" class="form-control" id="baseUrl" name="baseUrl" placeholder="https://api.exemplo.com/clientes ou {{BASE_URL}}/clientes" required>
+                </div>
+                <div class="col-12">
+                  <label for="environment-id" class="form-label">Ambiente</label>
+                  <select id="environment-id" class="form-select"><option value="">Sem ambiente</option></select>
+                  <small class="text-muted">Use {{NOME_DA_VARIAVEL}} na URL, headers, parâmetros ou body. Gerencie os valores em Ambientes.</small>
                 </div>
                 <div class="col-12">
                   <label for="description" class="form-label">Descrição</label>

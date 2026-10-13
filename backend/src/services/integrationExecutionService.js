@@ -41,7 +41,8 @@ async function executeIntegration(id, user) {
     throw new AppError("Integração inativa não pode ser executada.", 400);
   }
 
-  if (!validateDestinationUrl(integration.baseUrl)) {
+  const { request } = await require('./environmentService').resolveIntegration(integration);
+  if (!validateDestinationUrl(request.baseUrl)) {
     throw new AppError("A URL da integração é inválida. Use apenas http:// ou https://.", 400);
   }
 

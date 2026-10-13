@@ -130,6 +130,7 @@ $(function () {
       baseUrl: $("#baseUrl").val(),
       method: $("#method").val(),
       status: $("#status").val(),
+      environmentId: $('#environment-id').val() ? Number($('#environment-id').val()) : null,
       ...(window.currentUser?.role === "ADMIN" && selectedOwnerId ? { ownerId: selectedOwnerId } : {}),
       headers: parseJsonField("#headers", "Headers", null),
       queryParams: parseJsonField("#queryParams", "Query Params", null),
@@ -259,6 +260,9 @@ $(function () {
 
   async function openIntegrationModal(id, readOnly = false) {
     resetIntegrationForm();
+    const environments = await requestJson(`/environments${selectedOwnerId ? `?ownerId=${encodeURIComponent(selectedOwnerId)}` : ''}`).catch(error => { showAlert('#modal-alert-container', error.message, 'warning'); return { data: [] }; });
+    $('#environment-id').html('<option value="">Sem ambiente</option>');
+    for (const env of environments.data) $('<option>').val(env.id).text(`${env.name} · ${env.stage}`).appendTo('#environment-id');
 
     if (id) {
       const result = await buscarIntegracao(id);
@@ -271,6 +275,7 @@ $(function () {
       $("#baseUrl").val(integration.baseUrl);
       $("#method").val(integration.method);
       $("#status").val(integration.status);
+      $('#environment-id').val(integration.environmentId || '');
       fillJsonTextarea("#headers", integration.headers);
       fillJsonTextarea("#queryParams", integration.queryParams);
       fillJsonTextarea("#body", integration.body);
@@ -381,11 +386,7 @@ $(function () {
   }
 
   $("#new-integration-button").on("click", function () {
-    resetIntegrationForm();
-    $("#integration-form :input").prop("disabled", false);
-    updateBodyAvailability();
-    $("#save-integration-button").show();
-    integrationModal.show();
+    openIntegrationModal(null).catch(error => showAlert('#alert-container', error.message, 'danger'));
   });
 
   $("#method").on("change", updateBodyAvailability);

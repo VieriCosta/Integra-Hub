@@ -20,5 +20,6 @@ router.use("/integrations", integrationRoutes);
 router.use("/executions", executionRoutes);
 router.use("/audit", auditRoutes);
 router.use('/automation', require('./automationRoutes'));
+router.use('/environments', require('./environmentRoutes'));
 
 module.exports = router;

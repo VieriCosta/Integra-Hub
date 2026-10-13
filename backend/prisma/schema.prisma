@@ -35,6 +35,7 @@ model User {
   integrations Integration[]
   sessions     AuthSession[]
   auditEvents  AuditEvent[]
+  environments Environment[]
 }
 
 model AuthSession {
@@ -75,9 +76,25 @@ model Integration {
   maxRetries Int @default(0)
   jobs ExecutionJob[]
   alerts IntegrationAlert[]
+  environmentId Int?
+  environment Environment? @relation(fields: [environmentId], references: [id])
 
   @@index([ownerId])
   @@index([nextRunAt])
+  @@index([environmentId])
+}
+
+model Environment {
+  id Int @id @default(autoincrement())
+  name String
+  stage String @default("DEVELOPMENT")
+  ownerId Int
+  encryptedVariables String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner User @relation(fields: [ownerId], references: [id])
+  integrations Integration[]
+  @@unique([ownerId, name])
 }
 
 model IntegrationExecution {
