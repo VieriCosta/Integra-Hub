@@ -1,5 +1,55 @@
 # IntegraHub
 
+## Melhorias de outubro de 2026
+
+- Dashboard com períodos de 7, 14 e 30 dias, gráfico diário, taxa de sucesso, tempo médio e links para as últimas falhas. Os contadores de hoje usam o fuso `America/Fortaleza`.
+- Integrações com busca por nome/URL, filtros por método/status, última execução e duplicação. Cópias começam inativas e preservam as credenciais no backend, sem expor os valores no navegador.
+- Headers e parâmetros podem ser editados como chave/valor ou JSON, com validação junto ao campo. Valores já existentes mantêm seu tipo até serem alterados.
+- Execuções e Logs têm filtros de data/hora. Selecione duas execuções da mesma integração para comparar HTTP, duração e diferenças na resposta. A comparação usa os dados mascarados disponíveis no histórico.
+- **Automação** permite configurar intervalos de 1 minuto a 7 dias, alertas por falhas consecutivas e lentidão, reconhecer alertas e acompanhar a fila. Alertas são exibidos dentro do sistema.
+- **Ambientes** permite separar desenvolvimento, homologação e produção. Variáveis protegidas são reutilizadas com `{{BASE_URL}}`, `{{API_TOKEN}}` etc. na URL, headers, parâmetros e body.
+
+### Atualizar uma instalação existente
+
+Na pasta `backend`, execute:
+
+```bash
+npx prisma migrate deploy
+npm run prisma:generate
+```
+
+Configure `CREDENTIAL_ENCRYPTION_KEY` no `.env` antes de criar ambientes. Gere uma chave com:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Guarde essa chave junto aos backups: as variáveis usam AES-256-GCM e uma nova chave não abre valores já salvos. A chave nunca deve ser commitada. Valores aparecem como `********`; manter a máscara preserva o valor e remover a chave do JSON remove a variável. Um ambiente deve pertencer ao mesmo proprietário da integração. Integrações antigas continuam funcionando sem ambiente.
+
+`EXECUTION_CONCURRENCY` define o limite global de chamadas externas simultâneas (padrão 3, máximo 10). A fila fica no PostgreSQL e o worker roda junto à API. Agendamentos dependem da API ligada; após uma interrupção, cada agenda vencida gera no máximo uma execução, sem reproduzir todos os intervalos perdidos. Uma integração com tarefa pendente ou em execução não acumula novas tarefas do agendamento.
+
+Somente GET pode ter até três tentativas extras, com espera progressiva para HTTP 429, 502, 503 e 504. Mutações não são repetidas automaticamente. Tarefas interrompidas são encerradas como erro para evitar repetir uma chamada que pode ter chegado ao destino. Alterar configuração ou credenciais enquanto uma tarefa aguarda cancela a chamada com uma mensagem; execute novamente para usar os novos valores.
+
+### Novos contratos da API
+
+`POST /api/integrations/:id/execute` retorna **202** com a execução `PENDING`. Consulte `GET /api/executions/:id` até obter `SUCCESS` ou `ERROR`. A interface acompanha esse processo automaticamente e indica quando é necessário continuar pelo histórico.
+
+```text
+POST /api/integrations/:id/duplicate
+GET  /api/dashboard?days=7
+GET  /api/executions?from=2026-10-01T00:00:00-03:00&to=2026-10-13T23:59:59-03:00
+GET  /api/automation
+PUT  /api/automation/integrations/:id
+POST /api/automation/alerts/:id/acknowledge
+GET  /api/environments
+POST /api/environments
+PUT  /api/environments/:id
+```
+
+As novas rotas exigem sessão e preservam o isolamento por proprietário. Dashboard, lista de ambientes e visão de automação aceitam `ownerId` para administradores. O corpo da configuração de automação é `{ scheduleMinutes, maxRetries, failureThreshold, slowThresholdMs }`, com `scheduleMinutes: null` para desligar. Ambientes recebem `{ name, stage, variables }`, com `stage` igual a `DEVELOPMENT`, `STAGING` ou `PRODUCTION`.
+
+Os testes com `TEST_DATABASE_URL` também validam fila, concorrência, agendamento, retry seguro, alertas, criptografia, variáveis, duplicação, filtros e isolamento das novas rotas. Use um banco de testes dedicado e com todas as migrations aplicadas.
+
 Plataforma de gerenciamento, monitoramento e auditoria de integrações entre sistemas e APIs.
 
 ## Objetivo
@@ -270,11 +320,13 @@ Ao clicar em `Executar`, o backend:
 
 - busca a integração;
 - valida se existe e está `ACTIVE`;
-- registra uma execução `RUNNING`;
+- registra uma execução `PENDING` e uma tarefa persistida na fila;
+- retorna HTTP 202 para a interface, que consulta o andamento;
+- o worker marca a execução `RUNNING` quando há uma vaga disponível;
 - executa a chamada com Axios;
 - mede a duração;
 - salva HTTP status, snapshot mascarado do request, response e erro quando houver;
-- retorna o resultado para o frontend.
+- disponibiliza o resultado no endpoint de detalhes para o frontend.
 
 Status HTTP de `200` até `299` são `SUCCESS`. Outros status, como `404` ou `500`, são registrados como `ERROR` sem derrubar a aplicação.
 
