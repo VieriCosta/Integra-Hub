@@ -6,7 +6,6 @@ const { AppError } = require("../utils/AppError");
 const scrypt = promisify(crypto.scrypt);
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 const COOKIE_NAME = "ih_session";
-const attempts = new Map();
 
 function publicUser(user) {
   return { id: user.id, email: user.email, role: user.role, isActive: user.isActive };
@@ -101,20 +100,11 @@ async function setupAdmin(req, res) {
 async function login(emailValue, passwordValue, req, res) {
   const email = normalizeEmail(emailValue);
   const password = typeof passwordValue === "string" ? passwordValue : "";
-  const key = `${req.ip}:${email}`;
-  const now = Date.now();
-  const record = attempts.get(key);
-  if (record && record.until > now && record.count >= 5) {
-    throw new AppError("Muitas tentativas. Aguarde 15 minutos.", 429);
-  }
   const user = await prisma.user.findUnique({ where: { email } });
   const valid = user && user.isActive && await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    const count = record && record.until > now ? record.count + 1 : 1;
-    attempts.set(key, { count, until: now + 15 * 60 * 1000 });
     throw new AppError("E-mail ou senha inválidos.", 401);
   }
-  attempts.delete(key);
   return createSession(user, res);
 }
 

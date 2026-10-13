@@ -9,3 +9,11 @@
 .DS_Store
 Thumbs.db
 /.tmp/
+*.sql.gz
+*.dump
+*.backup
+*.pem
+*.key
+*.p12
+*.pfx
+/.aws/

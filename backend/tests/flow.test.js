@@ -54,6 +54,7 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
   let adminId;
   let userId;
   let environmentId;
+  let demoUserId;
   const oldVaultKey = process.env.CREDENTIAL_ENCRYPTION_KEY;
   const oldConcurrency = process.env.EXECUTION_CONCURRENCY;
   process.env.CREDENTIAL_ENCRYPTION_KEY = require('node:crypto').randomBytes(32).toString('base64');
@@ -84,6 +85,15 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
     };
   };
   try {
+    const healthResponse = await fetch(base + '/health');
+    assert.equal(healthResponse.headers.get('x-powered-by'), null);
+    assert.equal(healthResponse.headers.get('cache-control'), 'no-store');
+    assert.equal(healthResponse.headers.get('x-content-type-options'), 'nosniff');
+    const malformed = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"password":"do-not-log-this"' });
+    assert.equal(malformed.status, 400);
+    assert.ok(!JSON.stringify(await malformed.json()).includes('do-not-log-this'));
+    const crossSite = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site' }, body: '{}' });
+    assert.equal(crossSite.status, 403);
     assert.equal((await request("/integrations", "GET", undefined, null)).status, 401);
     assert.equal((await request("/auth/setup-status", "GET", undefined, null)).body.data.required, true);
     const setup = await request("/auth/setup", "POST", {
@@ -360,6 +370,18 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
     assert.equal(canceledRequest.status, 'ERROR');
     assert.match(canceledRequest.errorMessage, /alteradas após/);
     assert.equal(mutationCalls, 4);
+    for (let count = 0; count < 10; count++) assert.equal((await request('/auth/login', 'POST', { email: 'throttle@example.test', password: 'wrong-password-1234' }, null)).status, 401);
+    assert.equal((await request('/auth/login', 'POST', { email: 'throttle@example.test', password: 'wrong-password-1234' }, null)).status, 429);
+    const demoUser = await prisma.user.create({ data: { email: 'security-demo@integrahub.local', role: 'USER', passwordHash: 'non-login-test-fixture' } });
+    demoUserId = demoUser.id;
+    const { seedDemo } = require('../scripts/seed-demo');
+    await seedDemo({ email: demoUser.email, allowDemoData: true });
+    const demoIntegrations = await prisma.integration.findMany({ where: { ownerId: demoUserId }, select: { id: true } });
+    createdIds.push(...demoIntegrations.map(item => item.id));
+    await seedDemo({ email: demoUser.email, allowDemoData: true });
+    assert.equal(await prisma.integration.count({ where: { ownerId: demoUserId } }), 8);
+    assert.equal(await prisma.integrationExecution.count({ where: { integration: { is: { ownerId: demoUserId } } } }), 225);
+    assert.equal(await prisma.executionJob.count({ where: { integration: { is: { ownerId: demoUserId } }, state: { in: ['PENDING', 'RUNNING'] } } }), 0);
   } finally {
     await require('../src/services/queueService').stopWorker();
     axios.defaults.adapter = oldAdapter;
@@ -371,6 +393,7 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
       await prisma.integration.delete({ where: { id } });
     }
     if (environmentId) await prisma.environment.delete({ where: { id: environmentId } });
+    if (demoUserId) { await prisma.environment.deleteMany({ where: { ownerId: demoUserId } }); await prisma.user.delete({ where: { id: demoUserId } }); }
     if (oldVaultKey === undefined) delete process.env.CREDENTIAL_ENCRYPTION_KEY; else process.env.CREDENTIAL_ENCRYPTION_KEY = oldVaultKey;
     if (oldConcurrency === undefined) delete process.env.EXECUTION_CONCURRENCY; else process.env.EXECUTION_CONCURRENCY = oldConcurrency;
     await prisma.authSession.deleteMany({ where: { userId: { in: [adminId, userId].filter(Boolean) } } });

@@ -4,11 +4,13 @@
   "description": "API do IntegraHub para gerenciamento de integracoes.",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "node --watch server.js",
     "start": "node server.js",
     "test": "node --test",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "security:check": "node scripts/security-check.js",
+    "seed:demo": "node scripts/seed-demo.js"
   },
   "keywords": [
     "integrations",
@@ -20,16 +22,16 @@
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^6.14.0",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9",
     "prisma": "^6.14.0"
   },
   "overrides": {
-    "deepmerge-ts": "8.0.2"
+    "deepmerge-ts": "8.0.2",
+    "proxy-addr": "^2.0.8"
   }
 }
