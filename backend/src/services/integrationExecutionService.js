@@ -45,37 +45,10 @@ async function executeIntegration(id, user) {
     throw new AppError("A URL da integração é inválida. Use apenas http:// ou https://.", 400);
   }
 
-  const requestSnapshot = buildRequestSnapshot(integration);
-  const startedAt = new Date();
-
-  const execution = await executionRepository.create({
-    integrationId,
-    status: "RUNNING",
-    startedAt,
-    ...sanitizeExecution(requestSnapshot)
-  }, user.id);
-
-  const result = await executeHttpRequest(integration);
-
-  const updatedExecution = await executionRepository.update(execution.id, {
-    status: result.status,
-    httpStatus: result.httpStatus,
-    responseBody: sanitizeExecution({ responseBody: result.responseBody }).responseBody,
-    errorMessage: result.errorMessage,
-    startedAt: result.startedAt,
-    finishedAt: result.finishedAt,
-    durationMs: result.durationMs
-  }, user.id);
-
-  return sanitizeExecution({
-    ...updatedExecution,
-    integration: {
-      id: integration.id,
-      name: integration.name,
-      description: integration.description,
-      status: integration.status
-    }
-  });
+  const { enqueue, startWorker } = require('./queueService');
+  const queued = await require('../config/prisma').$transaction(tx => enqueue(integration, user.id, tx));
+  startWorker();
+  return sanitizeExecution(queued);
 }
 
 async function listExecutionsByIntegration(id, pageValue = 1, pageSizeValue = 20, user) {

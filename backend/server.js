@@ -3,6 +3,7 @@ require("dotenv").config();
 const app = require("./src/app");
 const { recoverStaleExecutions } = require("./src/services/integrationExecutionService");
 const { cleanupExpiredSessions } = require("./src/services/authService");
+const { startWorker } = require('./src/services/queueService');
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -10,6 +11,7 @@ const HOST = process.env.HOST || "127.0.0.1";
 app.listen(PORT, HOST, () => {
   console.log(`IntegraHub API running on ${HOST}:${PORT}`);
 });
+startWorker();
 
 async function recover() {
   try {

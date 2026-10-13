@@ -19,5 +19,6 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/integrations", integrationRoutes);
 router.use("/executions", executionRoutes);
 router.use("/audit", auditRoutes);
+router.use('/automation', require('./automationRoutes'));
 
 module.exports = router;

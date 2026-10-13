@@ -4,7 +4,7 @@ async function executeIntegration(req, res, next) {
   try {
     const execution = await integrationExecutionService.executeIntegration(req.params.id, req.user);
 
-    res.json({
+    res.status(202).json({
       success: true,
       data: execution
     });

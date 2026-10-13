@@ -53,9 +53,15 @@ async function atualizarIntegracao(id, dados) {
 }
 
 async function executarIntegracao(id) {
-  return requestJson(`/integrations/${id}/execute`, {
+  const queued = await requestJson(`/integrations/${id}/execute`, {
     method: "POST"
   });
+  for (let attempt = 0; attempt < 180; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const result = await buscarExecucao(queued.data.id);
+    if (['SUCCESS', 'ERROR'].includes(result.data.status)) return result;
+  }
+  throw new Error(`Execução #${queued.data.id} continua na fila. Acompanhe em Execuções.`);
 }
 
 async function listarExecucoesIntegracao(id, page = 1) {

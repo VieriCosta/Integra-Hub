@@ -6,7 +6,7 @@ const { executionOwnerWhere } = require("../utils/accessScope");
 const ACTIONS = new Set([
   "INTEGRATION_EXISTING", "EXECUTION_EXISTING",
   "INTEGRATION_CREATED", "INTEGRATION_UPDATED",
-  "EXECUTION_STARTED", "EXECUTION_FINISHED", "EXECUTION_RECOVERED"
+  "EXECUTION_STARTED", "EXECUTION_FINISHED", "EXECUTION_RECOVERED", 'EXECUTION_QUEUED', 'AUTOMATION_UPDATED'
 ]);
 
 async function listAuditEvents(pageValue, pageSizeValue, actionValue, integrationIdValue, user, ownerIdValue) {

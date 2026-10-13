@@ -68,8 +68,16 @@ model Integration {
   auditEvents AuditEvent[]
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
+  scheduleMinutes Int?
+  nextRunAt DateTime?
+  failureThreshold Int @default(3)
+  slowThresholdMs Int @default(5000)
+  maxRetries Int @default(0)
+  jobs ExecutionJob[]
+  alerts IntegrationAlert[]
 
   @@index([ownerId])
+  @@index([nextRunAt])
 }
 
 model IntegrationExecution {
@@ -90,10 +98,38 @@ model IntegrationExecution {
   createdAt          DateTime                   @default(now())
   integration        Integration                @relation(fields: [integrationId], references: [id])
   auditEvents        AuditEvent[]
+  job                ExecutionJob?
 
   @@index([integrationId])
   @@index([createdAt])
   @@index([status])
+}
+
+model ExecutionJob {
+  id Int @id @default(autoincrement())
+  integrationId Int
+  executionId Int @unique
+  actorId Int?
+  state String @default("PENDING")
+  attempts Int @default(0)
+  runAt DateTime @default(now())
+  claimedAt DateTime?
+  finishedAt DateTime?
+  createdAt DateTime @default(now())
+  integration Integration @relation(fields: [integrationId], references: [id])
+  execution IntegrationExecution @relation(fields: [executionId], references: [id])
+  @@index([state, runAt])
+}
+
+model IntegrationAlert {
+  id Int @id @default(autoincrement())
+  integrationId Int
+  kind String
+  message String
+  createdAt DateTime @default(now())
+  acknowledgedAt DateTime?
+  integration Integration @relation(fields: [integrationId], references: [id])
+  @@index([integrationId, acknowledgedAt])
 }
 
 model AuditEvent {

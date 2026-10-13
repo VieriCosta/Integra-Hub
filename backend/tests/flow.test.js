@@ -120,7 +120,11 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
       assert.ok(storedIntegration.baseUrl.includes("url-secret"));
 
       const execution = await request(`/integrations/${id}/execute`, "POST");
-      assert.equal(execution.status, 200);
+      assert.equal(execution.status, 202);
+      for (let count = 0; count < 100 && ['PENDING', 'RUNNING'].includes(execution.body.data.status); count++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        execution.body = (await request(`/executions/${execution.body.data.id}`)).body;
+      }
       assert.equal(execution.body.data.status, expected);
       if (path !== "redirect") assert.equal(execution.body.data.httpStatus, path === "ok" ? 200 : 404);
       else assert.match(execution.body.data.errorMessage, /não permitido/);
@@ -176,6 +180,10 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
     createdIds.push(ownId);
     assert.equal(userIntegration.body.data.ownerId, userId);
     const userExecution = await request(`/integrations/${ownId}/execute`, "POST", undefined, userCookie);
+    for (let count = 0; count < 100 && ['PENDING', 'RUNNING'].includes(userExecution.body.data.status); count++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      userExecution.body = (await request(`/executions/${userExecution.body.data.id}`, 'GET', undefined, userCookie)).body;
+    }
     assert.equal(userExecution.body.data.status, "ERROR");
 
     assert.deepEqual((await request("/integrations", "GET", undefined, userCookie)).body.data.map((item) => item.id), [ownId]);
@@ -258,9 +266,12 @@ test("login, isolamento por usuário, admin, HTTP 200/404 e auditoria no Postgre
       assert.equal((await request(path)).status, 400, path);
     }
   } finally {
+    await require('../src/services/queueService').stopWorker();
     axios.defaults.adapter = oldAdapter;
     for (const id of createdIds) {
       await prisma.auditEvent.deleteMany({ where: { integrationId: id } });
+      await prisma.executionJob.deleteMany({ where: { integrationId: id } });
+      await prisma.integrationAlert.deleteMany({ where: { integrationId: id } });
       await prisma.integrationExecution.deleteMany({ where: { integrationId: id } });
       await prisma.integration.delete({ where: { id } });
     }
