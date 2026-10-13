@@ -1,5 +1,7 @@
 # IntegraHub
 
+As verificações de segurança, automação no GitHub e geração segura dos dados fictícios estão documentadas em [SECURITY.md](SECURITY.md).
+
 ## Melhorias de outubro de 2026
 
 - Dashboard com períodos de 7, 14 e 30 dias, gráfico diário, taxa de sucesso, tempo médio e links para as últimas falhas. Os contadores de hoje usam o fuso `America/Fortaleza`.
@@ -120,7 +122,7 @@ integrahub/
 
 ## Requisitos
 
-- Node.js 18 ou superior
+- Node.js 22 ou superior (desenvolvimento usa `node --watch`)
 - npm
 - PostgreSQL instalado e em execução
 
