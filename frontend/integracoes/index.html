@@ -48,6 +48,11 @@
             </div>
 
             <div id="alert-container"></div>
+            <div class="row g-2 mb-3">
+              <div class="col-md-6"><label for="integration-search" class="form-label">Buscar nome ou URL</label><input id="integration-search" type="search" class="form-control"></div>
+              <div class="col-md-3"><label for="method-filter" class="form-label">Método</label><select id="method-filter" class="form-select"><option value="">Todos</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div>
+              <div class="col-md-3"><label for="integration-status-filter" class="form-label">Status</label><select id="integration-status-filter" class="form-select"><option value="">Todos</option><option value="ACTIVE">Ativa</option><option value="INACTIVE">Inativa</option></select></div>
+            </div>
 
             <div class="table-responsive corporate-table">
               <table class="table table-hover align-middle mb-0 integration-table">
@@ -58,7 +63,7 @@
                     <th>URL</th>
                     <th>Proprietário</th>
                     <th>Status</th>
-                    <th>Criado em</th>
+                    <th>Última execução</th>
                     <th class="text-end">Ações</th>
                   </tr>
                 </thead>

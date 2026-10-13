@@ -130,6 +130,12 @@ async function updateIntegration(id, payload, user) {
 }
 
 module.exports = {
+  async duplicateIntegration(id, user) {
+    const previous = await integrationRepository.findById(parseId(id), ownerWhere(user));
+    if (!previous) throw new AppError('Integração não encontrada.', 404);
+    const data = validateIntegrationPayload({ ...previous, name: `${previous.name} (cópia)`, status: 'INACTIVE' });
+    return sanitizeIntegration(await integrationRepository.create({ ...data, ownerId: user.id }, user.id));
+  },
   listIntegrations,
   getIntegrationById,
   createIntegration,

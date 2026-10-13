@@ -53,6 +53,10 @@ async function updateIntegration(req, res, next) {
 }
 
 module.exports = {
+  async duplicateIntegration(req, res, next) {
+    try { res.status(201).json({ success: true, data: await integrationService.duplicateIntegration(req.params.id, req.user) }); }
+    catch (error) { next(error); }
+  },
   listIntegrations,
   getIntegrationById,
   createIntegration,

@@ -3,7 +3,7 @@ const prisma = require("../config/prisma");
 async function findAll(where = {}) {
   return prisma.integration.findMany({
     where,
-    include: { owner: { select: { id: true, email: true } } },
+    include: { owner: { select: { id: true, email: true } }, executions: { take: 1, orderBy: { id: 'desc' }, select: { id: true, status: true, createdAt: true, durationMs: true } } },
     orderBy: {
       createdAt: "desc"
     }

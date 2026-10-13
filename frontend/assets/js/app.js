@@ -143,17 +143,21 @@ $(function () {
       return;
     }
 
-    const rows = integrations.map((integration) => `
+    const search = $('#integration-search').val().toLowerCase();
+    const visible = integrations.filter(item => `${item.name} ${item.baseUrl}`.toLowerCase().includes(search) && (!$('#method-filter').val() || item.method === $('#method-filter').val()) && (!$('#integration-status-filter').val() || item.status === $('#integration-status-filter').val()));
+    if (!visible.length) { $tableBody.html(emptyRow('Nenhuma integração corresponde aos filtros.')); return; }
+    const rows = visible.map((integration) => `
       <tr>
         <td>${escapeHtml(integration.name)}</td>
         <td>${methodBadge(integration.method)}</td>
         <td class="url-cell" title="${escapeAttribute(integration.baseUrl)}">${escapeHtml(integration.baseUrl)}</td>
         <td>${escapeHtml(integration.owner?.email || "Legado")}</td>
         <td>${statusBadge(integration.status)}</td>
-        <td>${formatDate(integration.createdAt)}</td>
+        <td>${integration.executions?.[0] ? `${executionStatusBadge(integration.executions[0].status)}<br>${formatDate(integration.executions[0].createdAt)}<br>${integration.executions[0].durationMs ?? '—'} ms` : 'Nunca executada'}</td>
         <td class="text-end action-cell">
           <button class="btn btn-sm btn-outline-secondary js-view" type="button" data-id="${integration.id}">Visualizar</button>
           <button class="btn btn-sm btn-outline-primary js-edit" type="button" data-id="${integration.id}">Editar</button>
+          <button class="btn btn-sm btn-outline-secondary js-duplicate" type="button" data-id="${integration.id}">Duplicar</button>
           <button class="btn btn-sm btn-success js-execute" type="button" data-id="${integration.id}" ${integration.status !== "ACTIVE" ? "disabled" : ""}>Executar</button>
           <button class="btn btn-sm btn-outline-dark js-history" type="button" data-id="${integration.id}">Histórico</button>
         </td>
@@ -336,6 +340,7 @@ $(function () {
       const result = await executarIntegracao(integrationToExecute.id);
       executeModal.hide();
       renderResultModal(result.data);
+      await loadIntegrations();
     } catch (error) {
       showAlert("#alert-container", error.message, "danger");
     } finally {
@@ -381,6 +386,12 @@ $(function () {
   });
 
   $("#method").on("change", updateBodyAvailability);
+  $('#integration-search, #method-filter, #integration-status-filter').on('input change', renderIntegrations);
+  $tableBody.on('click', '.js-duplicate', async function () {
+    $(this).prop('disabled', true);
+    try { await requestJson(`/integrations/${$(this).data('id')}/duplicate`, { method: 'POST' }); await loadIntegrations(); showAlert('#alert-container', 'Cópia criada como inativa.'); }
+    catch (error) { showAlert('#alert-container', error.message, 'danger'); $(this).prop('disabled', false); }
+  });
   $("#integration-form").on("submit", saveIntegration);
   $("#confirm-execute-button").on("click", confirmExecution);
 
